@@ -1,0 +1,20 @@
+{
+  "name": "scale-images-api-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": "git+ssh://git@bitbucket.org/yondemon/scale-images-api-test.git",
+  "author": "Pablo Rod. <pablo.rodriguez@kairosds.com>",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/yondemon/scale-images-api-test#readme",
+  "dependencies": {
+    "express": "^4.18.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.16"
+  }
+}
