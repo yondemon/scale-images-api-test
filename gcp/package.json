@@ -1,0 +1,16 @@
+{
+  "name": "gcloud-image-resize",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=imageResize",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.1.1",
+    "imagemagick": "^0.1.3"
+  }
+}
