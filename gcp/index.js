@@ -1,11 +1,13 @@
-const {Storage} = require('@google-cloud/storage');
-const storage = new Storage();
-
 const path = require('path');
-const im = require('imagemagick');
+const gm = require('gm').subClass({imageMagick: true});
+const fs = require('fs').promises;
+const {Storage} = require('@google-cloud/storage');
 
-const bucket = "personal-310814-uploadimages";
+const config = require('./config.json');
+const { stdout } = require('process');
 
+const storage = new Storage();
+const {bucket, widths} = config;
 
 exports.createResizedImagesFromBucket = (req, res) => {
   const filename = req.query.f;
@@ -40,49 +42,104 @@ exports.createResizedImagesFromBucket = (req, res) => {
   })
 }
 
-exports.resizeImagesOnUpload = (event, callback) => {
-  console.log(event);
-  const {bucket, filename } = event;
-  const widths = [800,1024];
+exports.resizeImagesOnUpload = async (event, callback = () =>{}) => {
+  // console.log('Event:', event);
+  const {bucket: fileBucket, name: filePath, contentType, resourceState, metageneration } = event;
 
-  const storageFile = storage.bucket(bucket).file(filename);
-  console.log(storageFile);
+  if( filePath.includes('thumb@') ) {
+    console.log(`${filePath} is already a thumbnail`)
+    if (typeof callback === 'function') callback();
+    return false;
+  }
+  if (!contentType.startsWith('image/') ){
+    console.log(`${filePath} is not an image [${contentType}]`)
+    if (typeof callback === 'function') callback();
+    return false;
+  }
+  if (resourceState === 'not_exists') {
+    console.log('Delete event');
+    if (typeof callback === 'function') callback();
+    return false;
+  }
+  if (resourceState === 'exists' && metageneration > 1) {
+    console.log('Metadata change event');
+    if (typeof callback === 'function') callback();
+    return false;
+  }
 
-  widths.each((width) => {
-    console.log(`Processing width: ${width}`);
+  const storageFile = storage.bucket(fileBucket).file(filePath);
+  const storageFilePath = `gs://${fileBucket}/${filePath}`;
+  // console.log('Storage File:', storageFile);
 
-    createImageResizedWidth(storageFile, width)
-      .then ((storageFileResult) => {
-        res.status(200).send({
-          image: storageFileResult,
-          original: filename,
-          width
-        });
-      })
-      .catch((err) => {
-        console.error(`Error on createImageResized: `, err);
-        return Promise.reject(err);
-      })
+  await Promise.all(
+    widths.map((width) => {
+      console.log(`Processing ${storageFilePath} - width: ${width}`);
 
-  })
-  
-  if(callback) callback();
+      createImageResizedWidth(storageFile, width, fileBucket)
+        .then ((storageFileResult) => {
+          console.log(`DONE: ${width} ${storageFileResult}`);
+          return Promise.resolve(storageFileResult);
+        })
+        .catch((err) => {
+          console.error(`Error on createImageResized: `, err);
+          return Promise.reject(err);
+        })
+    })
+  )
+    
+  if (typeof callback === 'function') callback();
   return;
 }
 
-async function createImageResizedWidth(storageFile, width){
-  const parsedFilename = path.parse(storageFile.name);
-  const filename = parsedFilename.base;
-  const dir = parsedFilename.dir;
-  const ext = parsedFilename.ext;
+async function createImageResizedWidth(storageFile, width, dstBucketName){
+  console.log('createImageResizedWidth', storageFile.name);
+  const filePath = storageFile.name;
+  const {base: fileName, name } = path.parse(filePath);
 
-  task = im.resize({
-    srcPath: storageFile,
-    dstPath: `${filename}/${filename}-${width}.${ext}`,
-    width:   width
-  }, function(err, stdout, stderr){
-    if (err) throw err;
-    console.log(`Resized ${filename} to ${width}px width`);
+  const dstFileName = `thumb@${width}_${fileName}`;
+  // const srcPath = `gs://${bucket}/${filename}`;
+  // const storeageDstPath = `gs://${dstBucketName}/${name}/${dstFileName}`;
+  const storeageDstPath = `${name}/${dstFileName}`;
+  
+  console.log(storeageDstPath);
+
+  const srcTmpPath = `/tmp/${fileName}`;
+  const dstTmpPath = `/tmp/${dstFileName}`;
+
+  try {
+    await storageFile.download({destination: srcTmpPath});
+    console.log(`Downloaded ${storageFile.name} to ${srcTmpPath}`);
+  } catch (err) {
+    throw new Error(`File download failed: ${err}`);
+  }
+
+  await new Promise((resolve, reject) => {
+    gm(srcTmpPath)
+      .resize(width)
+      .write(dstTmpPath, (err, stdout) => {
+        if(err) {
+          console.log(`Error: `, err);
+          reject(err);
+        } else {
+          console.log(`Done: [${width}] ${dstTmpPath}`);
+          resolve(stdout);
+        }
+      });
   });
-  return task;
+  
+  console.log(dstBucketName);
+  const bucket = storage.bucket(dstBucketName);
+  try {
+    await bucket.upload(dstTmpPath, {destination: storeageDstPath});
+    console.log(`Uploaded image to: ${storeageDstPath}`);
+  } catch (err) {
+    throw new Error(`Unable to upload image to ${storeageDstPath}: ${err}`);
+  }
+
+  await Promise.all([
+    fs.unlink(srcTmpPath),
+    fs.unlink(dstTmpPath)
+  ]);
+
+  return Promise.resolve(storeageDstPath);
 }
