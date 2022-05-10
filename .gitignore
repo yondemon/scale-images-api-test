@@ -44,4 +44,5 @@ Thumbs.db
 *.wmv
 
 # Config files
-config/*.js
+*/config/*.js
+*/config/*.json

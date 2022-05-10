@@ -4,7 +4,6 @@ const fs = require('fs').promises;
 const {Storage} = require('@google-cloud/storage');
 
 const config = require('./config.json');
-const { stdout } = require('process');
 
 const storage = new Storage();
 const {bucket, widths} = config;
@@ -19,7 +18,6 @@ exports.createResizedImagesFromBucket = (req, res) => {
   }
 
   console.log(`Bucket: ${bucket} - File: ${filename}`);
-  const dir = path.dirname(filename);
   const storageFile = storage.bucket(bucket).file(filename);
 
   witdhs = widthsQuery.split(',');
