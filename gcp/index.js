@@ -8,39 +8,91 @@ const config = require('./config.json');
 const storage = new Storage();
 const {bucket, widths} = config;
 
-exports.createResizedImagesFromBucket = (req, res) => {
-  const filename = req.query.f;
-  const widths = req.query.widths;
-
-  if (!filename) {
-    res.status(400).send("No filename");
-    return;
+exports.resizeImagesOnUploadHTTP = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).end();
   }
 
-  console.log(`Bucket: ${bucket} - File: ${filename}`);
-  const storageFile = storage.bucket(bucket).file(filename);
+  try {
+    const busboy = Busboy({headers: req.headers});
 
-  witdhs = widthsQuery.split(',');
-  widths.each((width) => {
-    console.log(`Processing width: ${width}`);
+    if (!req.files) {
+      return res.status(400).send({ message: "Please upload a file!" });
+    }
 
-    createImageResizedWidth(storageFile, width)
-      .then ((storageFileResult) => {
-        res.status(200).send({
-          image: storageFileResult,
-          original: filename,
-          width
+    const fileWrite = null;
+    const file = null;
+    busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
+      if(fieldname == 'file'){
+        if (!mimetype || !mimetype.startsWith('image/')) {
+          return res.status(400).send('Only images are allowed');
+        }
+  
+        console.log(`Processing file ${filename}`);
+        
+        const srcTmpPath = `/tmp/${filename}`;
+        const writeStream = fs.createWriteStream(srcTmpPath);
+        file.pipe(writeStream);
+
+        fileWrite = new Promise((resolve, reject) => {
+          file.on('end', () => {
+            writeStream.end();
+          });
+          writeStream.on('finish', () => {
+
+            fs.readFile(filepath, (err, buffer) => {
+
+              if (err) {
+                return reject(err);
+              }
+
+              file 
+              resolve();
+            });
+          });
+          writeStream.on('error', reject);
         });
-      })
-      .catch((err) => {
-        console.error(`Error on createImageResized: `, err);
-        return Promise.reject(err);
-      })
+      }
+    });
 
-  })
+    busboy.on('finish', async () => {
+      await fileWrite;
+
+      await Promise.all(
+        widths.map((width) => {
+          console.log(`Processing ${filename} - width: ${width}`);
+  
+          createImageResizedWidth(fileUploaded, width, fileBucket)
+            .then ((storageFileResult) => {
+              console.log(`DONE: ${width}`, storageFileResult);
+              
+              return Promise.resolve(storageFileResult);
+            })
+            .catch((err) => {
+              console.error(`Error on createImageResized: `, err);
+              return Promise.reject(err);
+            })
+        })
+      )
+
+      res
+        .status(200)
+        .send({
+          messge: 'processing',
+          filename,
+          widths: widths.join(',')
+        });
+
+    });
+
+  } catch (err) {
+    res.status(500).send({
+      message: `Could not process the file: ${req.files['file'].name}. ${err}`,
+    });
+  }
 }
 
-exports.resizeImagesOnUpload = async (event, callback = () =>{}) => {
+exports.resizeImagesOnUploadToBucket = async (event, callback = () =>{}) => {
   // console.log('Event:', event);
   const {bucket: fileBucket, name: filePath, contentType, resourceState, metageneration } = event;
 
@@ -73,7 +125,7 @@ exports.resizeImagesOnUpload = async (event, callback = () =>{}) => {
     widths.map((width) => {
       console.log(`Processing ${storageFilePath} - width: ${width}`);
 
-      createImageResizedWidth(storageFile, width, fileBucket)
+      createImageResizedWidthFromStorage(storageFile, width, fileBucket)
         .then ((storageFileResult) => {
           console.log(`DONE: ${width} ${storageFileResult}`);
           return Promise.resolve(storageFileResult);
@@ -89,30 +141,19 @@ exports.resizeImagesOnUpload = async (event, callback = () =>{}) => {
   return;
 }
 
-async function createImageResizedWidth(storageFile, width, dstBucketName){
-  console.log('createImageResizedWidth', storageFile.name);
-  const filePath = storageFile.name;
+async function createImageResizedWidth( filepath, width, dstBucketName, callback ){
+  console.log('createImageResizedWidth', filepath);
+
   const {base: fileName, name } = path.parse(filePath);
 
   const dstFileName = `thumb@${width}_${fileName}`;
-  // const srcPath = `gs://${bucket}/${filename}`;
-  // const storeageDstPath = `gs://${dstBucketName}/${name}/${dstFileName}`;
-  const storeageDstPath = `${name}/${dstFileName}`;
-  
-  console.log(storeageDstPath);
+  const storageDstPath = `${name}/${dstFileName}`;
+  console.log(storageDstPath);
 
-  const srcTmpPath = `/tmp/${fileName}`;
   const dstTmpPath = `/tmp/${dstFileName}`;
 
-  try {
-    await storageFile.download({destination: srcTmpPath});
-    console.log(`Downloaded ${storageFile.name} to ${srcTmpPath}`);
-  } catch (err) {
-    throw new Error(`File download failed: ${err}`);
-  }
-
   await new Promise((resolve, reject) => {
-    gm(srcTmpPath)
+    gm(filepath)
       .resize(width)
       .write(dstTmpPath, (err, stdout) => {
         if(err) {
@@ -124,20 +165,47 @@ async function createImageResizedWidth(storageFile, width, dstBucketName){
         }
       });
   });
-  
+
   console.log(dstBucketName);
   const bucket = storage.bucket(dstBucketName);
+
   try {
-    await bucket.upload(dstTmpPath, {destination: storeageDstPath});
-    console.log(`Uploaded image to: ${storeageDstPath}`);
+    await bucket.upload(dstTmpPath, {destination: storageDstPath});
+    console.log(`Uploaded image to: ${storageDstPath}`, {
+      image: fileName,
+      dst: storageDstPath,
+      width: width,
+    });
+    callback({
+      image: fileName,
+      dst: storageDstPath,
+      width: width,
+    });
   } catch (err) {
-    throw new Error(`Unable to upload image to ${storeageDstPath}: ${err}`);
+    throw new Error(`Unable to upload image to ${storageDstPath}: ${err}`);
   }
 
-  await Promise.all([
-    fs.unlink(srcTmpPath),
-    fs.unlink(dstTmpPath)
-  ]);
+  return Promise.resolve();
+}
 
-  return Promise.resolve(storeageDstPath);
+async function createImageResizedWidthFromStorage(storageFile, width, dstBucketName){
+  console.log('createImageResizedWidthFromStorage', storageFile.name);
+  const filePath = storageFile.name;
+  const {base: fileName } = path.parse(filePath);
+  
+  const srcTmpPath = `/tmp/${fileName}`;
+
+  try {
+    await storageFile.download({destination: srcTmpPath});
+    console.log(`Downloaded ${storageFile.name} to ${srcTmpPath}`);
+  } catch (err) {
+    throw new Error(`File download failed: ${err}`);
+  }
+
+  createImageResizedWidth( srcTmpPath, width, dstBucketName, 
+    async (result) => {
+      await fs.unlink(srcTmpPath);
+
+      return Promise.resolve(result.dst);  
+    });
 }

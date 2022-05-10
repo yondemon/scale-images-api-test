@@ -4,14 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "functions-framework --target=imageResize",
-    "start:event": "functions-framework --target=resizeImagesOnUpload --signature-type=event",
+    "start:http": "functions-framework --target=resizeImagesOnUploadHTTP --signature-type=http",
+    "start:event": "functions-framework --target=resizeImagesOnUploadToBucket --signature-type=event",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@google-cloud/storage": "^5.19.4",
+    "busboy": "^1.6.0",
     "gm": "^1.23.1"
   },
   "devDependencies": {
