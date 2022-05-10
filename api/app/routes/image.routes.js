@@ -5,7 +5,7 @@ module.exports = app => {
 
   router.post("/", image.uploadToGCP);
 
-  // router.get("/:imageId", image.download);
+  router.get("/:imageId", image.downloadFromGCP);
 
   app.use('/image', router);
 };
