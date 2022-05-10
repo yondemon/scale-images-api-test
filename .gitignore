@@ -45,4 +45,4 @@ Thumbs.db
 
 # Config files
 */config/*.js
-*/config/*.json
+.env

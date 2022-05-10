@@ -1,0 +1,52 @@
+services:
+  api:
+    container_name: images-api
+    depends_on:
+      - db
+    build: .
+    env_file: .env
+    # restart: unless-stopped
+    ports:
+      - 3200:3200
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS
+      - MONGO_USERNAME=$MONGO_USERNAME
+      - MONGO_PASSWORD=$MONGO_PASSWORD
+      - MONGO_HOSTNAME=db
+      - MONGO_PORT=$MONGO_PORT
+      - MONGO_DB=$MONGO_DB
+    volumes:
+      - ./api:/opt/app/api
+      - ./api/node_modules:/opt/app/api/node_modules
+    networks:
+      - app-network
+    # command: wait-for.sh help
+    # command: ./wait-for.sh images-db:$MONGO_PORT -- echo "MONGO UP!"
+    # command: ./wait-for.sh imagesdb:$MONGO_PORT -- /opt/app/api/node_modules/.bin/nodemon ./api/index.js
+    command: /opt/app/api/node_modules/.bin/nodemon ./api/index.js
+
+  db:
+    container_name: images-db
+    image: mongo
+    # command: --quiet
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - $MONGO_PORT:$MONGO_PORT
+    expose:
+      - $MONGO_PORT
+    volumes:
+      - mongodata:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$MONGO_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD=$MONGO_PASSWORD
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodata:
+  node_modules:

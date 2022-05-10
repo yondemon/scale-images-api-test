@@ -1,6 +1,7 @@
-const dbConfig = require("../../config/db.config.js");
-
 const mongoose = require("mongoose");
+
+const dbConfig = require("../../config/db.js");
+
 mongoose.Promise = global.Promise;
 // mongoose.set('useFindAndModify', false);
 
