@@ -2,7 +2,7 @@ services:
   api:
     container_name: images-api
     depends_on:
-      - db
+      - mongo_db
     build: .
     env_file: .env
     # restart: unless-stopped
@@ -21,14 +21,12 @@ services:
       - ./api/node_modules:/opt/app/api/node_modules
     networks:
       - app-network
-    # command: wait-for.sh help
-    # command: ./wait-for.sh images-db:$MONGO_PORT -- echo "MONGO UP!"
     # command: ./wait-for.sh imagesdb:$MONGO_PORT -- /opt/app/api/node_modules/.bin/nodemon ./api/index.js
     command: /opt/app/api/node_modules/.bin/nodemon ./api/index.js
 
-  db:
-    container_name: images-db
+  mongo_db:
     image: mongo
+    container_name: images-db
     # command: --quiet
     restart: unless-stopped
     env_file: .env
@@ -38,9 +36,11 @@ services:
       - $MONGO_PORT
     volumes:
       - mongodata:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
     environment:
       - MONGO_INITDB_ROOT_USERNAME=$MONGO_USERNAME
       - MONGO_INITDB_ROOT_PASSWORD=$MONGO_PASSWORD
+      - MONGO_INITDB_DATABASE=application_database
     networks:
       - app-network
 
@@ -49,5 +49,5 @@ networks:
     driver: bridge
 
 volumes:
-  mongodata:
   node_modules:
+  mongodata:

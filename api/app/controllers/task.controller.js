@@ -1,6 +1,5 @@
 const db = require("../models");
 const Task = db.tasks;
-// const Image = db.images;
 
 exports.create = (req, res) => {
   const msg = 'NEW TASK!';
