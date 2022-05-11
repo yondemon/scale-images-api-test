@@ -1,36 +1,38 @@
 const path = require('path');
+const os = require('os');
+const fs = require('fs');
+
 const gm = require('gm').subClass({imageMagick: true});
-const fs = require('fs').promises;
 const {Storage} = require('@google-cloud/storage');
+const Busboy = require('busboy');
 
 const config = require('./config.json');
 
 const storage = new Storage();
-const {bucket, widths} = config;
+const {bucketName, widths} = config;
 
 exports.resizeImagesOnUploadHTTP = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).end();
   }
-
+  
   try {
-    const busboy = Busboy({headers: req.headers});
+    const bb = Busboy({headers: req.headers});
+    const tmpdir = os.tmpdir();
 
-    if (!req.files) {
-      return res.status(400).send({ message: "Please upload a file!" });
-    }
+    let srcTmpPath = null;
+    let fileWrite = null;
 
-    const fileWrite = null;
-    const file = null;
-    busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
-      if(fieldname == 'file'){
-        if (!mimetype || !mimetype.startsWith('image/')) {
+    bb.on('file', (fieldName, file, info) => {
+      const { filename, mimeType } = info;
+      console.log(`on file: ${filename}`, info);
+      if(fieldName == 'image'){
+        if (!mimeType || !mimeType.startsWith('image/')) {
           return res.status(400).send('Only images are allowed');
         }
-  
-        console.log(`Processing file ${filename}`);
+        console.log(`Processing image ${filename}`);
         
-        const srcTmpPath = `/tmp/${filename}`;
+        srcTmpPath = path.join(tmpdir, filename);
         const writeStream = fs.createWriteStream(srcTmpPath);
         file.pipe(writeStream);
 
@@ -38,59 +40,56 @@ exports.resizeImagesOnUploadHTTP = async (req, res) => {
           file.on('end', () => {
             writeStream.end();
           });
-          writeStream.on('finish', () => {
-
-            fs.readFile(filepath, (err, buffer) => {
-
-              if (err) {
-                return reject(err);
-              }
-
-              file 
-              resolve();
-            });
-          });
+          writeStream.on('finish', resolve);
           writeStream.on('error', reject);
         });
       }
     });
 
-    busboy.on('finish', async () => {
-      await fileWrite;
+    bb.on('finish', async () => {
+      if(fileWrite !== null) {
+        await fileWrite;
+        console.log(fileWrite, srcTmpPath);
+        const {base: filename} = path.parse(srcTmpPath);
 
-      await Promise.all(
-        widths.map((width) => {
-          console.log(`Processing ${filename} - width: ${width}`);
-  
-          createImageResizedWidth(fileUploaded, width, fileBucket)
-            .then ((storageFileResult) => {
-              console.log(`DONE: ${width}`, storageFileResult);
-              
-              return Promise.resolve(storageFileResult);
-            })
-            .catch((err) => {
-              console.error(`Error on createImageResized: `, err);
-              return Promise.reject(err);
-            })
-        })
-      )
+        await Promise.all(
+          widths.map((width) => {
+            console.log(`Processing ${srcTmpPath} - width: ${width}`);
+    
+            createImageResizedWidth(srcTmpPath, width, bucketName)
+              .then ((storageFileResult) => {
+                console.log(`DONE: ${width}`, storageFileResult);
+                
+                return Promise.resolve(storageFileResult);
+              })
+              .catch((err) => {
+                console.error(`Error on createImageResized: `, err);
+                return Promise.reject(err);
+              })
+          })
+        )
 
-      res
-        .status(200)
-        .send({
-          messge: 'processing',
-          filename,
-          widths: widths.join(',')
-        });
+        res
+          .status(200)
+          .send({
+            messge: 'processing',
+            filename,
+            widths: widths.join(',')
+          });
+      } else {
+        res.status(405).end();
+      }
 
     });
-
+    
+    bb.end(req.rawBody);
+    
   } catch (err) {
     res.status(500).send({
-      message: `Could not process the file: ${req.files['file'].name}. ${err}`,
+      message: `Could not process the request: ${err}`,
     });
   }
-}
+};
 
 exports.resizeImagesOnUploadToBucket = async (event, callback = () =>{}) => {
   // console.log('Event:', event);
@@ -139,21 +138,22 @@ exports.resizeImagesOnUploadToBucket = async (event, callback = () =>{}) => {
     
   if (typeof callback === 'function') callback();
   return;
-}
+};
 
-async function createImageResizedWidth( filepath, width, dstBucketName, callback ){
-  console.log('createImageResizedWidth', filepath);
+async function createImageResizedWidth( filePath, width, dstBucketName, callback ){
+  console.log('createImageResizedWidth', filePath);
 
+  const tmpdir = os.tmpdir();
   const {base: fileName, name } = path.parse(filePath);
 
   const dstFileName = `thumb@${width}_${fileName}`;
   const storageDstPath = `${name}/${dstFileName}`;
   console.log(storageDstPath);
 
-  const dstTmpPath = `/tmp/${dstFileName}`;
+  const dstTmpPath = path.join(tmpdir, dstFileName);
 
   await new Promise((resolve, reject) => {
-    gm(filepath)
+    gm(filePath)
       .resize(width)
       .write(dstTmpPath, (err, stdout) => {
         if(err) {
@@ -204,7 +204,7 @@ async function createImageResizedWidthFromStorage(storageFile, width, dstBucketN
 
   createImageResizedWidth( srcTmpPath, width, dstBucketName, 
     async (result) => {
-      await fs.unlink(srcTmpPath);
+      await fs.promises.unlink(srcTmpPath);
 
       return Promise.resolve(result.dst);  
     });
