@@ -1,4 +1,7 @@
+const path = require('path');
 const https = require('https');
+const FormData = require('form-data');
+const { v4: uuidv4 } = require('uuid');
 
 const gcpConfig = require("../../config/gcp.config.js");
 
@@ -14,19 +17,20 @@ exports.create = async (req, res) => {
   }
 
   const fileUploaded = req.files['image'];
-  console.log(fileUploaded);
+  if(!fileUploaded){
+    return res.status(400).send('No image file found on request');
+  }
   try {
-
     const { mimetype, name: fileName, md5 } = fileUploaded;
     if (!mimetype || !mimetype.startsWith('image/')) {
       return res.status(400).send('Only images are allowed');
     }
 
-    // const filePath = path.parse(fileName);
-    // const fileExtension = filePath.ext;
-    // const fileName = `${uuidv4()}${fileExtension}`;
+    const filePath = path.parse(fileName);
+    const fileExtension = filePath.ext;
+    const gcFileName = `${uuidv4()}${fileExtension}`;
     // const image = new Image({
-    //   resource: fileName,
+    //   resource: gcFileName,
     //   path: fileName,
     //   md5,
     //   resolution: null,
@@ -34,24 +38,26 @@ exports.create = async (req, res) => {
     // });
     // image.save();
 
-    let options = {
+    let form = new FormData();
+    form.append('image', fileUploaded.data, gcFileName);
+
+    const options = {
       host: gcpDomain,
       method: 'POST',
       path: `/${gcpFunctionTrigger}`,
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Length': fileUploaded.size
-      }
+      headers: form.getHeaders(), 
+      timeout: 20000,
     };
 
-    const uploadRequest = https.request(options, uploadResponse => {
-      console.log(uploadResponse);
-      res.writeHead(uploadResponse.statusCode, uploadResponse.headers);
-      uploadResponse.pipe(res);
-    });
-
-    uploadRequest.write(fileUploaded.data);
-    uploadRequest.end();
+    const uploadRequest = https.request(options,
+      (uploadResponse) => {
+        res.writeHead(uploadResponse.statusCode, uploadResponse.headers);
+        uploadResponse.pipe(res);
+      });
+    uploadRequest.on('timeout', (err) => {res.status(408).send(err)});
+    uploadRequest.on('error', (err) => {console.error(err)});
+    
+    form.pipe(uploadRequest);
 
   } catch (err) {
     res.status(500).send({
