@@ -11,12 +11,11 @@ Esta API permite enviar imágenes para ser escaladas. El resultado se guarada en
 
 ## Prerequisitos:
 
-* Docker y Docker compose instalados
-* Se apoya en Google Cloud Platform, debes tener una cuenta con Cloud Functions y Cloud Storage.
-    * En Google Cloud platform:
-      * Crea un fichero de credenciales  [Google Cloud: Autentícate como cuenta de servicio](https://cloud.google.com/docs/authentication/production#manually) y déjalo en `$HOME/gcp/gcp-credentials.json`
-    * En Cloud Storage: 
-      * Crear un bucket para las imagenes.
+* [Instala Docker y Docker compose](https://docs.docker.com/compose/install/)
+* [Instala el CLI de gcloud](https://cloud.google.com/sdk/docs/install)
+* Google Cloud Platform, debes tener una cuenta con Cloud Functions y Cloud Storage activados.
+    * Crea un fichero de credenciales [Google Cloud: Autentícate como cuenta de servicio](https://cloud.google.com/docs/authentication/production#manually) y déjalo en `$HOME/gcp/gcp-credentials.json`
+    * En Cloud Storage: Crear un bucket para las imagenes.
 
 ## Ficheros de configuración
 
@@ -31,22 +30,27 @@ Se han añadido ficheros .dist de los que se han degenerar copias sin la extensi
     * `config.json` - variables de entorno de ejecución: GCP bucket y anchos que se generarán
 
 ## Arranque local
-## Despliegue API
-* `docker-compose build`
-* `docker-compose up -d`
-
-Tendremos el servidor disponible en `http://localhost:3200`
 
 ### Despliegue GCP
-* [Instala el CLI de gcloud](https://cloud.google.com/sdk/docs/install)
+Usa CLI de gcloud (mirar prerequisitos).
+
 * `cd gcp`
 * `gcloud init`
 * `npm run deploy:http`
 
-En línea de comandos se nos indicará la
+En línea de comandos se nos indicará la URL del servicio.
+### Despliegue API
+Usa Docker (mirar prerequisitos).
+
+* `docker-compose build`
+* `docker-compose up -d`
+
+Tendremos el servidor disponible en [`http://localhost:3200`](http://localhost:3200)
 
 ## Flujo de aplicación
-- API `POST /task`, se envía una imagen desde un formulario multipart, en el campo 'image'.
+
+Endpoints en API:
+- `POST /task`, se envía una imagen desde un formulario multipart, en el campo 'image'.
   - OK (200). El fichero se envio a GCP para ser procesado y se lanzó el procesado.
-- API `GET /task/:taskID` al acceder se comprueba que la tarea está terminada y en tal caso se descargan los fichero resultantes a output.
+- `GET /task/:taskID` al acceder se comprueba que la tarea está terminada y en tal caso se descargan los fichero resultantes a output.
   - OK (200). Los fichero fueron descargados de GCP a la carpeta output. Se recibe un array con las URLs de los ficheros.
