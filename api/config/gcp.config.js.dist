@@ -1,0 +1,5 @@
+module.exports = {
+  bucketName: "STORAGE-BUCKET",
+  domain: 'REGION-STORAGE.cloudfunctions.net',
+  functionHttpsTrigger: 'resizeImagesOnUploadHTTP',
+};

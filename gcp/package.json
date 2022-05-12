@@ -6,6 +6,8 @@
   "scripts": {
     "start:http": "functions-framework --target=resizeImagesOnUploadHTTP --signature-type=http",
     "start:event": "functions-framework --target=resizeImagesOnUploadToBucket --signature-type=event",
+    "deploy:http": "env-cmd --use-shell 'gcloud functions deploy resizeImagesOnUploadHTTP --trigger-http --region $GCP_REGION --runtime nodejs16'",
+    "deploy:event": "env-cmd --use-shell 'gcloud functions deploy resizeImagesOnUploadToBucket --stage-bucket $GCP_STAGEBUCKET --region $GCP_REGION --trigger-bucket $GCP_BUCKET --runtime nodejs16'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -16,6 +18,7 @@
     "gm": "^1.23.1"
   },
   "devDependencies": {
-    "@google-cloud/functions-framework": "^3.1.1"
+    "@google-cloud/functions-framework": "^3.1.1",
+    "env-cmd": "^10.1.0"
   }
 }
