@@ -12,7 +12,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/gcp/gcp-credentials.json
       - MONGO_USERNAME=$MONGO_USERNAME
       - MONGO_PASSWORD=$MONGO_PASSWORD
-      - MONGO_HOSTNAME=db
+      - MONGO_HOSTNAME=images-db
       - MONGO_PORT=$MONGO_PORT
       - MONGO_DB=$MONGO_DB
     volumes:
@@ -40,7 +40,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=$MONGO_USERNAME
       - MONGO_INITDB_ROOT_PASSWORD=$MONGO_PASSWORD
-      - MONGO_INITDB_DATABASE=application_database
+      - MONGO_INITDB_DATABASE=$MONGO_DB
     networks:
       - app-network
 

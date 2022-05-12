@@ -7,7 +7,11 @@ mongoose.Promise = global.Promise;
 
 const db = {};
 db.mongoose = mongoose;
-db.url = dbConfig.url;
+db.url = dbConfig.URL;
+
+mongoose.connect(dbConfig.URL)
+  .then(()=>console.log(`connected ${dbConfig.URL}`))
+  .catch(e=>console.log(e));
 
 db.tasks = require("./tasks.model.js")(mongoose);
 db.images = require("./images.model.js")(mongoose);

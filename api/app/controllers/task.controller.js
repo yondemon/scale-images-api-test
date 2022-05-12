@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const gcpConfig = require("../../config/gcp.config.js");
 
 const db = require("../models");
-const Task = db.tasks;
+const Image = db.images;
 
 const bucketName = gcpConfig.bucketName;
 
@@ -32,14 +32,18 @@ exports.create = async (req, res) => {
     const filePath = path.parse(fileName);
     const fileExtension = filePath.ext;
     const gcFileName = `${uuidv4()}${fileExtension}`;
-    // const image = new Image({
-    //   resource: gcFileName,
-    //   path: fileName,
-    //   md5,
-    //   resolution: null,
-    //   processed: false,
-    // });
-    // image.save();
+    
+    const image = new Image({
+      resource: fileName,
+      gcpPath: gcFileName,
+      md5,
+      resolution: null,
+      processed: false,
+    });
+    image.save((err, img) => {
+      if (err) return console.log(err);
+      console.log(`Saved`, img);
+    });
 
     let form = new FormData();
     form.append('image', fileUploaded.data, gcFileName);
@@ -82,24 +86,6 @@ exports.status = (req, res) => {
   console.log(url);
 
   const widths = [800,1024];
-
-  /*
-  Task.findById(taskId)
-    .then(data => {
-      if (!data){
-        res.status(404).send({ message: "Not found Task id " + taskId });
-      } else {
-        res
-          .status(200)
-          .send(data);
-      }
-    })
-    .catch(err => {
-      res
-        .status(500)
-        .send({ message: "Error retrieving Task id " + taskId });
-    });
-  */
 
   const filePath = path.parse(fileName);
   const thumbFileDir = path.resolve(__dirname,`../../public/output/${filePath.name}/`);
