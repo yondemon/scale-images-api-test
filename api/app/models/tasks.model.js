@@ -3,6 +3,7 @@ module.exports = mongoose => {
     "tasks",
     mongoose.Schema(
       {
+        id: String,
         resource: String,
         path: String,
         done: { type: Boolean, default: false }

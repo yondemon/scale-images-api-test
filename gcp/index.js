@@ -22,10 +22,14 @@ exports.resizeImagesOnUploadHTTP = async (req, res) => {
 
     let srcTmpPath = null;
     let fileWrite = null;
+    const fields = new Map();
+
+    bb.on('field', function(fieldname, val) {
+      fields.set(fieldname, val);
+    });
 
     bb.on('file', (fieldName, file, info) => {
       const { filename, mimeType } = info;
-      console.log(`on file: ${filename}`, info);
       if(fieldName == 'image'){
         if (!mimeType || !mimeType.startsWith('image/')) {
           return res.status(400).send('Only images are allowed');
@@ -49,17 +53,23 @@ exports.resizeImagesOnUploadHTTP = async (req, res) => {
     bb.on('finish', async () => {
       if(fileWrite !== null) {
         await fileWrite;
-        console.log(fileWrite, srcTmpPath);
         const {base: filename} = path.parse(srcTmpPath);
 
         await Promise.all(
           widths.map((width) => {
-            console.log(`Processing ${srcTmpPath} - width: ${width}`);
+            console.log(`Process ${srcTmpPath} width: ${width}`);
     
             createImageResizedWidth(srcTmpPath, width, bucketName)
               .then ((storageFileResult) => {
-                console.log(`DONE: ${width}`, storageFileResult);
-                
+                const originHost = req.headers.origin;
+                const callbackEndpoint = fields.get('callbackEndpoint');
+                const task = fields.get('task');
+
+                console.log(`DONE [${task}]: ${width}`);
+
+                const url = `http://${originHost}${callbackEndpoint}`;
+                console.log(url);
+
                 return Promise.resolve(storageFileResult);
               })
               .catch((err) => {
@@ -118,7 +128,6 @@ exports.resizeImagesOnUploadToBucket = async (event, callback = () =>{}) => {
 
   const storageFile = storage.bucket(fileBucket).file(filePath);
   const storageFilePath = `gs://${fileBucket}/${filePath}`;
-  // console.log('Storage File:', storageFile);
 
   await Promise.all(
     widths.map((width) => {
@@ -126,7 +135,6 @@ exports.resizeImagesOnUploadToBucket = async (event, callback = () =>{}) => {
 
       createImageResizedWidthFromStorage(storageFile, width, fileBucket)
         .then ((storageFileResult) => {
-          console.log(`DONE: ${width} ${storageFileResult}`);
           return Promise.resolve(storageFileResult);
         })
         .catch((err) => {
@@ -141,14 +149,11 @@ exports.resizeImagesOnUploadToBucket = async (event, callback = () =>{}) => {
 };
 
 async function createImageResizedWidth( filePath, width, dstBucketName, callback = () => {} ){
-  console.log('createImageResizedWidth', filePath);
-
   const tmpdir = os.tmpdir();
   const {base: fileName, name } = path.parse(filePath);
 
   const dstFileName = `thumb@${width}_${fileName}`;
   const storageDstPath = `${name}/${dstFileName}`;
-  console.log(storageDstPath);
 
   const dstTmpPath = path.join(tmpdir, dstFileName);
 
@@ -161,12 +166,11 @@ async function createImageResizedWidth( filePath, width, dstBucketName, callback
           reject(err);
         } else {
           console.log(`Done: [${width}] ${dstTmpPath}`);
-          resolve(stdout);
+          resolve(dstTmpPath);
         }
       });
   });
 
-  console.log(dstBucketName);
   const bucket = storage.bucket(dstBucketName);
 
   try {
@@ -192,7 +196,6 @@ async function createImageResizedWidth( filePath, width, dstBucketName, callback
 }
 
 async function createImageResizedWidthFromStorage(storageFile, width, dstBucketName){
-  console.log('createImageResizedWidthFromStorage', storageFile.name);
   const filePath = storageFile.name;
   const {base: fileName } = path.parse(filePath);
   
