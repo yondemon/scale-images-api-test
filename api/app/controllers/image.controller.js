@@ -1,4 +1,6 @@
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
 const {Storage} = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 
@@ -53,6 +55,20 @@ exports.uploadToGCP = async (req, res) => {
   }
 }
 
-exports.downloadFromGCP = async (req, res) => {
-  console.log('download');
+exports.updateUploadedToGCP = async (req, res) => {
+  const imageId = req.params.imageId;
+  console.log(`processed! ${imageId} download`);
+
+  const fileName = '/output/test.jpg';
+  const file = fs.createWriteStream(fileName);
+  https.get(resourceUrl, (res) => {
+    res.pipe(file);
+
+    file.on("finish", () => {
+      file.close();
+      console.log(`Downloaded ${fileName}`);
+    })
+  });
+
+  res.status(200).send();
 };

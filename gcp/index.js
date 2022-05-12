@@ -140,7 +140,7 @@ exports.resizeImagesOnUploadToBucket = async (event, callback = () =>{}) => {
   return;
 };
 
-async function createImageResizedWidth( filePath, width, dstBucketName, callback ){
+async function createImageResizedWidth( filePath, width, dstBucketName, callback = () => {} ){
   console.log('createImageResizedWidth', filePath);
 
   const tmpdir = os.tmpdir();
@@ -170,12 +170,15 @@ async function createImageResizedWidth( filePath, width, dstBucketName, callback
   const bucket = storage.bucket(dstBucketName);
 
   try {
-    await bucket.upload(dstTmpPath, {destination: storageDstPath});
+    const result = await bucket.upload(dstTmpPath, {destination: storageDstPath});
     console.log(`Uploaded image to: ${storageDstPath}`, {
       image: fileName,
       dst: storageDstPath,
       width: width,
-    });
+      result: result[1]
+    }
+    );
+    
     callback({
       image: fileName,
       dst: storageDstPath,

@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const https = require('https');
 const FormData = require('form-data');
 const { v4: uuidv4 } = require('uuid');
@@ -7,6 +8,8 @@ const gcpConfig = require("../../config/gcp.config.js");
 
 const db = require("../models");
 const Task = db.tasks;
+
+const bucketName = gcpConfig.bucketName;
 
 exports.create = async (req, res) => {
   const { domain: gcpDomain, functionHttpsTrigger: gcpFunctionTrigger } = gcpConfig;
@@ -74,6 +77,13 @@ exports.status = (req, res) => {
     return;
   }
 
+  const fileName = `${taskId}.jpg`
+  const url = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+  console.log(url);
+
+  const widths = [800,1024];
+
+  /*
   Task.findById(taskId)
     .then(data => {
       if (!data){
@@ -89,4 +99,39 @@ exports.status = (req, res) => {
         .status(500)
         .send({ message: "Error retrieving Task id " + taskId });
     });
+  */
+
+  const filePath = path.parse(fileName);
+  const thumbFileDir = path.resolve(__dirname,`../../public/output/${filePath.name}/`);
+  if (!fs.existsSync(thumbFileDir)){
+    fs.mkdirSync(thumbFileDir, { recursive: true });
+  }
+
+  try {
+    const thumbs = widths.map((width) => {
+      const fileUrl = `https://storage.googleapis.com/${bucketName}/${taskId}/thumb@${width}_${fileName}`;
+
+      const thumbFileName = path.join(thumbFileDir, `${width}${filePath.ext}`);
+      console.log(thumbFileName);
+
+      const file = fs.createWriteStream(thumbFileName);
+      https.get(fileUrl, (res) => {
+        res.pipe(file);
+    
+        file.on("finish", () => {
+          file.close();
+          console.log(`Downloaded ${fileUrl}\n to ${thumbFileName}`);
+        })
+      });
+  
+      return url;
+    })
+  
+    res.status(200).send({
+      thumbs
+    });
+  }
+  catch (err) {
+    res.status(500).send(`Error: ${err}`);
+  }
 }

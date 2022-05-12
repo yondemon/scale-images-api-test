@@ -46,3 +46,4 @@ Thumbs.db
 # Config files
 */config/*.js
 .env
+output/

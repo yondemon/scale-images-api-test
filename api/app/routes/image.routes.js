@@ -4,8 +4,8 @@ module.exports = app => {
   var router = require("express").Router();
 
   router.post("/", image.uploadToGCP);
-
-  router.get("/:imageId", image.downloadFromGCP);
+  router.patch("/;imageId", image.updateUploadedToGCP);
+  // router.get("/:imageId", image.downloadFromGCP);
 
   app.use('/image', router);
 };
