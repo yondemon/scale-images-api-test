@@ -88,29 +88,50 @@ exports.status = (req, res) => {
   const widths = [800,1024];
 
   const filePath = path.parse(fileName);
-  const thumbFileDir = path.resolve(__dirname,`../../public/output/${filePath.name}/`);
-  if (!fs.existsSync(thumbFileDir)){
-    fs.mkdirSync(thumbFileDir, { recursive: true });
-  }
+  const thumbFileBaseDir = path.resolve(__dirname,`../../public/output/${filePath.name}/`);
+  const thumbUrlBaseDir = `http://localhost:3200/output/${filePath.name}`;
 
   try {
     const thumbs = widths.map((width) => {
       const fileUrl = `https://storage.googleapis.com/${bucketName}/${taskId}/thumb@${width}_${fileName}`;
 
-      const thumbFileName = path.join(thumbFileDir, `${width}${filePath.ext}`);
-      console.log(thumbFileName);
+      const thumbFileDir = path.resolve(thumbFileBaseDir,width.toString());
+      const thumbUrlDir = `${thumbUrlBaseDir}/${width}`;
+      if (!fs.existsSync(thumbFileDir)){
+        fs.mkdirSync(thumbFileDir, { recursive: true });
+      }
+    
+      const thumbFileName = `${`md5`}${filePath.ext}`;
+      const thumbFilePath = path.join(thumbFileDir, thumbFileName);
+      const thumbUrl = `${thumbUrlDir}/${thumbFileName}`;
+      console.log(thumbFilePath);
 
-      const file = fs.createWriteStream(thumbFileName);
+      const file = fs.createWriteStream(thumbFilePath);
       https.get(fileUrl, (res) => {
         res.pipe(file);
     
         file.on("finish", () => {
           file.close();
-          console.log(`Downloaded ${fileUrl}\n to ${thumbFileName}`);
+          console.log(`Downloaded ${fileUrl}\n to ${thumbFilePath}`);
+
+          Image.update({gcpPath: `${taskId}.jpg`},
+            {$push: {thumbs: {
+              width,
+              gcpUrl: fileUrl,
+              resource: thumbFileName,
+            }}},
+            {},
+            (err) => {
+              if(err){
+                console.log(err);
+              }else{
+                console.log(`Added thumb ${thumbFileName} to DB`, );
+              }
+            });
         })
       });
   
-      return url;
+      return thumbUrl;
     })
   
     res.status(200).send({

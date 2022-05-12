@@ -2,7 +2,8 @@ const express = require("express");
 const fileUpload = require('express-fileupload');
 const app = express();
 
-app.use(express.static('public'));
+app.use('/output', express.static(__dirname + '/public/output', {index: false}));
+
 app.use(fileUpload({
   createParentPath: true
 }));
@@ -16,5 +17,5 @@ require("./app/routes/image.routes")(app);
 // set port, listen for requests
 const PORT = process.env.PORT || 3200;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}.`);
+  console.info(`Server is running on port ${PORT}.`);
 });

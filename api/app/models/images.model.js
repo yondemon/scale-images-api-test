@@ -4,9 +4,14 @@ module.exports = mongoose => {
     mongoose.Schema(
       {
         resource: String,
-        path: String,
+        gcpPath: String,
         md5: String,
         resolution: String,
+        thumbs: [{
+          width: Number,
+          gcpUrl: String,
+          resource: String,
+        }],
         processed: { type: Boolean, default: false }
       },
       { timestamps: true }
