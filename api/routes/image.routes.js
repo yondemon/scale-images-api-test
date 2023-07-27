@@ -1,7 +1,8 @@
-module.exports = app => {
-  const image = require("../controllers/image.controller.js");
+import express from 'express';
+import image from "../controllers/image.controller.js";
 
-  var router = require("express").Router();
+export default (app) => {
+  var router = express.Router();
 
   router.post("/", image.uploadToGCP);
   router.patch("/;imageId", image.updateUploadedToGCP);

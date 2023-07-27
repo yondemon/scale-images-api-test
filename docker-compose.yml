@@ -28,6 +28,7 @@ services:
     image: mongo
     container_name: images-db
     # command: --quiet
+    command: mongod --port $MONGO_PORT
     restart: unless-stopped
     env_file: .env
     ports:

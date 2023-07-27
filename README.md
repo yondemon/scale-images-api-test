@@ -11,15 +11,15 @@ Esta API permite enviar imágenes para ser escaladas. El resultado se guarada en
 
 ## Prerequisitos:
 
-* [Instala Docker y Docker compose](https://docs.docker.com/compose/install/)
+* [Instala Docker (y Docker compose)](https://docs.docker.com/compose/install/)
 * [Instala el CLI de gcloud](https://cloud.google.com/sdk/docs/install)
-* Google Cloud Platform, debes tener una cuenta con Cloud Functions y Cloud Storage activados.
+* **Google Cloud Platform**: debes tener una cuenta con Cloud Functions y Cloud Storage activados.
     * Crea un fichero de credenciales [Google Cloud: Autentícate como cuenta de servicio](https://cloud.google.com/docs/authentication/production#manually) y déjalo en `$HOME/gcp/gcp-credentials.json`
     * En Cloud Storage: Crear un bucket para las imagenes.
 
 ## Ficheros de configuración
 
-Se han añadido ficheros .dist de los que se han degenerar copias sin la extensión para añadir la configuración necesaria:
+Se han añadido ficheros `.dist` de los que se han degenerar copias sin la extensión para añadir la configuración necesaria:
 
 * `.env` - variables de entorno para docker-compose.
 * API
@@ -42,8 +42,8 @@ En línea de comandos se nos indicará la URL del servicio.
 ### Despliegue API
 Usa Docker (mirar prerequisitos).
 
-* `docker-compose build`
-* `docker-compose up -d`
+* `docker compose build`
+* `docker compose up -d`
 
 Tendremos el servidor disponible en [`http://localhost:3200`](http://localhost:3200)
 

@@ -1,19 +1,16 @@
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
-const crypto = require('crypto');
-const FormData = require('form-data');
-const { v4: uuidv4 } = require('uuid');
+import fs from 'fs';
+import https from 'https';
+import path from 'path';
+import  { v4 as uuidv4 } from 'uuid';
 
-const gcpConfig = require("../../config/gcp.config.js");
+import { getMD5FromFile } from '../helpers/md5.js';
+import { postImageToGCP } from '../infrastructure/gcp.js';
+import { imagesService, tasksService } from '../service/index.js';
+import gcpConfig from '../config/gcp.config.js';
 
-const db = require("../models");
-const Task = db.tasks;
-const Image = db.images;
+const { bucketName } = gcpConfig;
 
-const bucketName = gcpConfig.bucketName;
-
-exports.create = async (req, res) => {
+const create = async (req, res) => {
   if (!req.files) {
     return res.status(400).send({ message: "Please upload a file!" });
   }
@@ -30,16 +27,19 @@ exports.create = async (req, res) => {
     }
 
     const taskId = uuidv4();
-
-    persistImageData({fileName, gcpPath: fileName, taskId, md5});
-    createTaskData({fileName, taskId});
+    imagesService.createImage({fileName, gcpPath: fileName, taskId, md5});
+    tasksService.createTask(createTaskData({fileName, taskId}));
 
     postImageToGCP(
       fileUploaded,
       taskId, 
       (uploadResponse) => {
-        res.writeHead(uploadResponse.statusCode, uploadResponse.headers);
-        uploadResponse.pipe(res);
+        console.log('uploadResponse');
+        // res.writeHead(uploadResponse.statusCode, uploadResponse.headers);
+        // uploadResponse.pipe(res);      
+        return res.json({
+          taskId,
+        }).send();
       });
 
   } catch (err) {
@@ -49,7 +49,8 @@ exports.create = async (req, res) => {
   }
 }
 
-exports.status = async (req, res) => {
+
+const status = async (req, res) => {
   const taskId = req.params.taskId;
 
   if (!taskId) {
@@ -81,7 +82,7 @@ exports.status = async (req, res) => {
       }
     
       const thumbFileTempPath = path.join(thumbFileDir, thumbTempFileName);
-      console.log(thumbFileTempPath);
+      // console.log(thumbFileTempPath);
 
       const file = fs.createWriteStream(thumbFileTempPath);
       https.get(fileUrl, (res) => {
@@ -93,17 +94,22 @@ exports.status = async (req, res) => {
           
           const thumbFileName = `${md5}${filePath.ext}`;
           const thumbFilePath = path.join(thumbFileDir, thumbFileName);
-          console.log(thumbFileTempPath, thumbFilePath);
+          // console.log(thumbFileTempPath, thumbFilePath);
           fs.rename(thumbFileTempPath, thumbFilePath, (error) => {
             if (error) {
-              console.log(error);
+              console.error(error);
             }
           });
           
           console.log(`Downloaded ${fileUrl}\n to ${thumbFilePath}`);
 
 
-          const task = updateTaskData({id: taskId, done: true });
+          const task = taskService.updateTask({id: taskId, done: true });
+          imagesService.updateImageByResource(
+            {
+
+            }
+          )
           Image.update({resource: task.resource},
             {$push: {thumbs: {
               width,
@@ -114,7 +120,7 @@ exports.status = async (req, res) => {
             {},
             (err) => {
               if(err){
-                console.log(err);
+                console.error(err);
               }else{
                 console.log(`Added thumb ${thumbFileName} to DB`, );
               }
@@ -137,73 +143,12 @@ exports.status = async (req, res) => {
 }
 
 const createTaskData = (data) => {
-  const task = new Task({
+  return {
     id: data.taskId,
     resource: data.fileName,
     path: data.fileName,
     done: data.done,
-  });
-
-  task.save((err, img) => {
-    if (err) return console.log(err);
-    console.log(`Saved`, img);
-  });
-}
-
-const updateTaskData = async (data) => {
-  let res = await Taks.findOneAndUpdate(
-    { id: data.id }, 
-    { done: data.done },
-    {
-      new: true,
-      upsert: true,
-      rawResult: true
-    }
-  );
-  return res;
-}
-
-const persistImageData = (data) => {
-  const image = new Image({
-    resource: data.fileName,
-    gcpPath: data.gcpPath,
-    md5: data.md5,
-    resolution: null,
-    processed: false,
-  });
-
-  image.save((err, img) => {
-    if (err) return console.log(err);
-    console.log(`Saved`, img);
-  });
-};
-
-const postImageToGCP = (fileUploaded, taskId, callback) => {
-  const { domain: gcpDomain, functionHttpsTrigger: gcpFunctionTrigger } = gcpConfig;
-
-  let form = new FormData();
-  form.append('task', taskId);
-  form.append('callbackEndpoint', `/task/${taskId}`);
-  form.append('image', fileUploaded.data, fileUploaded.name);
-
-  const options = {
-    host: gcpDomain,
-    method: 'POST',
-    path: `/${gcpFunctionTrigger}`,
-    headers: form.getHeaders(), 
-    timeout: 20000,
   };
-
-  const uploadRequest = https.request(options, callback);
-
-  uploadRequest.on('timeout', (err) => {res.status(408).send(err)});
-  uploadRequest.on('error', (err) => {console.error(err)});
-  
-  form.pipe(uploadRequest);
-};
-
-const getMD5FromFile = (file) => {
-  const hash = crypto.createHash('md5');
-  hash.update(file);
-  return hash.digest('hex');
 }
+
+export default { create, status };

@@ -1,17 +1,16 @@
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
-const {Storage} = require('@google-cloud/storage');
-const { v4: uuidv4 } = require('uuid');
+import fs from 'fs';
+import https from 'https';
+import path from 'path';
+import  { v4 as uuidv4 } from 'uuid';
+import { Storage } from '@google-cloud/storage';
 
-const gcpConfig = require("../../config/gcp.config.js");
-const db = require("../models");
+import gcpConfig from '../config/gcp.config.js';
+import { imagesService, tasksService } from '../service/index.js';
 
-const bucketName = gcpConfig.bucketName;
+const { bucketName } = gcpConfig;
 const storage = new Storage();
-const Image = db.images;
 
-exports.uploadToGCP = async (req, res) => {
+const uploadToGCP = async (req, res) => {
   try {
     if (!req.files) {
       return res.status(400).send({ message: "Please upload a file!" });
@@ -27,14 +26,18 @@ exports.uploadToGCP = async (req, res) => {
     const fileExtension = filePath.ext;
     const fileName = `${uuidv4()}${fileExtension}`;
     
-    const image = new Image({
-      resource: fileName,
-      path: fileName,
-      md5: null,
-      resolution: null,
-      processed: false,
-    });
-    image.save();
+    try {
+      imageService.createImage({
+        resource: fileName,
+        path: fileName,
+        md5: null,
+        resolution: null,
+        processed: false,
+      });
+    } catch (err) {
+      return console.log(err);
+    }
+    console.log(`Saved`, img);
 
     const storageFile = storage.bucket(bucketName).file(fileName);
 
@@ -55,7 +58,7 @@ exports.uploadToGCP = async (req, res) => {
   }
 }
 
-exports.updateUploadedToGCP = async (req, res) => {
+const updateUploadedToGCP = async (req, res) => {
   const imageId = req.params.imageId;
   console.log(`processed! ${imageId} download`);
 
@@ -72,3 +75,15 @@ exports.updateUploadedToGCP = async (req, res) => {
 
   res.status(200).send();
 };
+
+const mapImageDataFromData = (data) => {
+  return {
+    resource: data.fileName,
+    gcpPath: data.gcpPath,
+    md5: data.md5,
+    resolution: null,
+    processed: false,
+  };
+};
+
+export default { uploadToGCP, updateUploadedToGCP };

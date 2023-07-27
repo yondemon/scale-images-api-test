@@ -82,7 +82,7 @@ exports.resizeImagesOnUploadHTTP = async (req, res) => {
         res
           .status(200)
           .send({
-            messge: 'processing',
+            message: 'processing',
             filename,
             widths: widths.join(',')
           });
